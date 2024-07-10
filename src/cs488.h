@@ -1791,8 +1791,6 @@ static float3 reflection_shade(const HitInfo& hit, const float3& viewDir, const 
 
 
 
-// ====== implement it in A2 ======
-// fill in the missing parts
 static float3 shade(const HitInfo& hit, const float3& viewDir, const int level) {
 	if(level==6)
 		return float3(0.0f, 0.0f, 0.0f);

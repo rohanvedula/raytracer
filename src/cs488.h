@@ -637,129 +637,6 @@ public:
 		}
 	}
 
-	static float interpolateDepth(float3& phi, const float3x3& vectorCords)
-	{
-		float position_depth = phi[0] * vectorCords[0][2] + phi[1] * vectorCords[1][2] + phi[2] * vectorCords[2][2];
-		return position_depth;
-	}
-
-
-	static float3x3 caclculateR(const float3x3& vectorCords)
-	{
-		float3x3 r = {{vectorCords[0][0], vectorCords[1][0], vectorCords[2][0]}, {vectorCords[0][1], vectorCords[1][1], vectorCords[2][1]}, {1.0f, 1.0f, 1.0f}};
-		return inverse(r);
-	}
-
-	static void setCoords(const Triangle& tri, const float4x4& plm, float3x3& vertex_coords, float3& w_coords, float& min_x, float& max_x, float& min_y, float& max_y)
-	{
-		for(int i = 0; i<3; i++)
-		{
-			float4 word_vect_coords {tri.positions[i].x, tri.positions[i].y, tri.positions[i].z, 1.0f};
-			float4 scene_coords = mul(plm, word_vect_coords);
-
-			w_coords[i] = scene_coords[3];
-			scene_coords = (1/scene_coords[3]) * scene_coords;
-			vertex_coords[i] = {(scene_coords[0]+1)/2*globalWidth, (scene_coords[1]+1)/2*globalHeight, scene_coords[2]};
-
-			max_x = std::max(max_x, vertex_coords[i][0]);
-			min_x = std::min(min_x, vertex_coords[i][0]);
-
-			max_y = std::max(max_y, vertex_coords[i][1]);
-			min_y = std::min(min_y, vertex_coords[i][1]);
-		}
-	}
-
-	static bool newIsInside(float3& phi)
-	{
-		if(phi[0]>=0 && phi[1]>=0 && phi[0]+phi[1]<=1)
-			return true;
-		return false;
-	}
-
-	static float2 interpolateTexture(float3& phi, const Triangle& tri)
-	{
-		float2 newTexCoords;
-		newTexCoords[0] = phi[0]* tri.texcoords[0][0] + phi[1]*tri.texcoords[1][0] + phi[2]*tri.texcoords[2][0];
-		newTexCoords[1] = phi[0]*tri.texcoords[0][1] + phi[1]*tri.texcoords[1][1] + phi[2]*tri.texcoords[2][1];
-		return newTexCoords;
-	}
-
-	static float3 interpolatePN(float3& phi, const float3 val[3])
-	{
-		float3 newTexCoords;
-		newTexCoords[0] = phi[0]* val[0][0] + phi[1]*val[1][0] + phi[2]*val[2][0];
-		newTexCoords[1] = phi[0]*val[0][1] + phi[1]*val[1][1] + phi[2]*val[2][1];
-		newTexCoords[2] = phi[0]*val[0][2] + phi[1]*val[1][2] + phi[2]*val[2][2];
-		return newTexCoords;
-	}
-
-	static float3 find_phi(float3x3& r, float x, float y, float3& w_coords)
-	{
-		// float3 position_vector = {x, y, 1.0f};
-		float3 phi;
-		//phi = mul(r,position_vector);
-		for(int i = 0; i<3; i++)
-			phi[i] = r[i][0]*x + r[i][1]*y + r[i][2]; //mul(r,position_vector);
-		// uncommenting this line will revert back to before perspective correct interpolation
-		// return phi;
-
-		float3 new_phi;
-		float den = phi[0]/w_coords[0] + phi[1]/w_coords[1] + phi[2]/w_coords[2];
-		for(int i = 0; i<3; i++)
-			new_phi[i] = (phi[i]/w_coords[i])/den;
-		return new_phi;
-	}
-
-	void rasterizeTriangle(const Triangle& tri, const float4x4& plm) const {
-		// ====== implement it in A1 ======
-		// rasterization of a triangle
-		// "plm" should be a matrix that contains perspective projection and the camera matrix
-		// you do not need to implement clipping
-		// you may call the "shade" function to get the pixel value
-		// (you may ignore viewDir for now)
-
-		float3x3 vertex_coords;
-		float3 w_coords;
-		float max_x = INT_MIN;
-		float min_x = INT_MAX;
-		float max_y = INT_MIN;
-		float min_y = INT_MAX;
-		setCoords(tri, plm, vertex_coords, w_coords, min_x, max_x, min_y, max_y);
-		float3x3 r_inverse = caclculateR(vertex_coords);
-		HitInfo shading_info;
-		shading_info.material = &materials[tri.idMaterial];
-
-		// code does task 1 (rasterizes the verticies)
-		// for(int i = 0; i<3; i++)
-		// {
-		// 	FrameBuffer.pixel((int) vertex_coords[i][0], (int) vertex_coords[i][1]) = float3(1.0f);
-		// }
-		// return;
-
-		for(int x = std::max((int)floor(min_x),0); x<std::min((int)ceil(max_x),FrameBuffer.width); x++)
-		{
-			for(int y = std::max((int)floor(min_y),0); y<std::min((int)ceil(max_y),FrameBuffer.width); y++)
-			{
-				float3 phi = find_phi(r_inverse,x+0.5,y+0.5, w_coords);
-				bool is_inside = newIsInside(phi);
-				float depth = interpolateDepth(phi, vertex_coords);
-				// commenting out line 734, 742, and the second half of the "and" condition on 737 will
-				// revert back to before depth adjustment
-
-				if(is_inside && depth<FrameBuffer.depth(x, y))
-				{
-					shading_info.T = interpolateTexture(phi, tri);
-					shading_info.P = interpolatePN(phi, tri.positions);
-					shading_info.N = interpolatePN(phi, tri.normals);
-					FrameBuffer.pixel(x, y) = shade(shading_info, {0,0,0});//materials[tri.idMaterial].Kd; //float3(tri.texcoords[0][0], tri.texcoords[0][1], 0);
-					FrameBuffer.depth(x, y) = depth;
-				}
-			}
-		}
-
-	}
-
-
 	bool raytraceTriangle(HitInfo& result, const Ray& ray, const Triangle& tri, float tMin, float tMax) const {
 		// ====== implement it in A2 ======
 		// ray-triangle intersection
@@ -988,10 +865,12 @@ private:
 		Material mtl;
 		mtl.texture = nullptr;
 		char line[81];
+		std::cout<<"Printing file: "<< fileName<<"\n";
 		while (fgets(line, 80, fp) != nullptr) {
 			float r, g, b, s;
 			std::string lineStr;
 			lineStr = line;
+			std::cout<<lineStr<<"\n";
 			int i = int(materials.size());
 
 			if (lineStr.compare(0, 6, "newmtl", 0, 6) == 0) {
@@ -1826,56 +1705,6 @@ public:
 		return hit;
 	}
 
-	// camera -> screen matrix (given to you for A1)
-	float4x4 perspectiveMatrix(float fovy, float aspect, float zNear, float zFar) const {
-		float4x4 m;
-		const float f = 1.0f / (tan(fovy * DegToRad / 2.0f));
-		m[0] = { f / aspect, 0.0f, 0.0f, 0.0f };
-		m[1] = { 0.0f, f, 0.0f, 0.0f };
-		m[2] = { 0.0f, 0.0f, (zFar + zNear) / (zNear - zFar), -1.0f };
-		m[3] = { 0.0f, 0.0f, (2.0f * zFar * zNear) / (zNear - zFar), 0.0f };
-
-		return m;
-	}
-
-	// model -> camera matrix (given to you for A1)
-	float4x4 lookatMatrix(const float3& _eye, const float3& _center, const float3& _up) const {
-		// transformation to the camera coordinate
-		float4x4 m;
-		const float3 f = normalize(_center - _eye);
-		const float3 upp = normalize(_up);
-		const float3 s = normalize(cross(f, upp));
-		const float3 u = cross(s, f);
-
-		m[0] = { s.x, s.y, s.z, 0.0f };
-		m[1] = { u.x, u.y, u.z, 0.0f };
-		m[2] = { -f.x, -f.y, -f.z, 0.0f };
-		m[3] = { 0.0f, 0.0f, 0.0f, 1.0f };
-		m = transpose(m);
-
-		// translation according to the camera location
-		const float4x4 t = float4x4{ {1.0f, 0.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 1.0f, 0.0f}, { -_eye.x, -_eye.y, -_eye.z, 1.0f} };
-
-		m = mul(m, t);
-		return m;
-	}
-
-	// rasterizer
-	void Rasterize() const {
-		// ====== implement it in A1 ======
-		// fill in plm by a proper matrix
-		const float4x4 pm = perspectiveMatrix(globalFOV, globalAspectRatio, globalDepthMin, globalDepthMax);
-		const float4x4 lm = lookatMatrix(globalEye, globalLookat, globalUp);
-		const float4x4 plm = mul(pm, lm);
-
-		FrameBuffer.clear();
-		for (int n = 0, n_n = (int)objects.size(); n < n_n; n++) {
-			for (int k = 0, k_n = (int)objects[n]->triangles.size(); k < k_n; k++) {
-				objects[n]->rasterizeTriangle(objects[n]->triangles[k], plm);
-			}
-		}
-	}
-
 	// eye ray generation (given to you for A2)
 	Ray eyeRay(int x, int y) const {
 		// compute the camera coordinate system 
@@ -1977,7 +1806,7 @@ static float3 shade(const HitInfo& hit, const float3& viewDir, const int level) 
 		for (int i = 0; i < globalScene.pointLightSources.size(); i++) {
 			// calculating the ray between light position and object hit point
 			float3 l = globalScene.pointLightSources[i]->position - hit.P;
-			//return hit.material->BRDF(l, viewDir, hit.N) * PI;
+			return hit.material->BRDF(l, viewDir, hit.N) * PI;
 			Ray r;
 			r.o = globalScene.pointLightSources[i]->position + Epsilon*hit.N; //moving point by small amount to avoid self-intersection
 			r.d = -normalize(l);
@@ -2179,9 +2008,8 @@ public:
 				globalParticleSystem.step();
 			}
 
-			if (globalRenderType == RENDER_RASTERIZE) {
-				globalScene.Rasterize();
-			} else if (globalRenderType == RENDER_RAYTRACE) {
+
+			if (globalRenderType == RENDER_RAYTRACE) {
 				globalScene.Raytrace();
 			} else if (globalRenderType == RENDER_IMAGE) {
 				if (process) process();

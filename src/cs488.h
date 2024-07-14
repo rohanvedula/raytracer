@@ -424,6 +424,11 @@ public:
 	int textureWidth = 0;
 	int textureHeight = 0;
 
+	bool hasBumpMap = false;
+	unsigned char* bumpMap = nullptr;
+	int bumpWidth = 0;
+	int bumpHeight = 0;
+
 	Material() {};
 	virtual ~Material() {};
 
@@ -449,6 +454,20 @@ public:
 		const unsigned char g = texture[pix + 1];
 		const unsigned char b = texture[pix + 2];
 		return float3(r, g, b) / 255.0f;
+	}
+
+	float3 fetchNormal(const float2& nor) const {
+		// repeating
+		int x = int(nor.x * bumpWidth) % bumpWidth;
+		int y = int(nor.y * bumpHeight) % bumpHeight;
+		if (x < 0) x += bumpWidth;
+		if (y < 0) y += bumpHeight;
+
+		int pix = (x + y * bumpWidth) * 3;
+		const unsigned char r = bumpMap[pix + 0];
+		const unsigned char g = bumpMap[pix + 1];
+		const unsigned char b = bumpMap[pix + 2];
+		return normalize(float3(r, g, b)/127.5f+float3(1.0f));
 	}
 
 	float3 BRDF(const float3& wi, const float3& wo, const float3& n) const {
@@ -504,6 +523,7 @@ public:
 	float3 P; // location
 	float3 N; // shading normal vector
 	float2 T; // texture coordinate
+	float3x3 pertubeMatrix;
 	const Material* material; // const pointer to the material of the intersected object
 };
 
@@ -615,7 +635,7 @@ struct Triangle {
 
 
 // triangle mesh
-static float3 shade(const HitInfo& hit, const float3& viewDir, const int level = 0);
+static float3 shade(HitInfo& hit, const float3& viewDir, const int level = 0);
 class TriangleMesh {
 public:
 	std::vector<Triangle> triangles;
@@ -635,6 +655,27 @@ public:
 				// not doing anything right now
 			}
 		}
+	}
+
+	static void fillPertubeMatrix(HitInfo& result, const Triangle& tri)
+	{
+		float3 e1 = tri.positions[1] - tri.positions[0];
+		float3 e2 = tri.positions[2] - tri.positions[1];
+
+		float u1 = tri.texcoords[1][0] - tri.texcoords[0][0];
+		float v1 = tri.texcoords[1][1] - tri.texcoords[0][1];
+		float u2 = tri.texcoords[2][0] - tri.texcoords[1][0];
+		float v2 = tri.texcoords[2][1] - tri.texcoords[1][1];
+
+		float det = 1.0f / (u1*v2 - v1*u2);
+
+		float3 tangent;
+		tangent = {det * (v2*e1.x - v1*e2.x), det * (v2*e1.y - v1*e2.y), det * (v2*e1.z - v1*e2.z)};
+
+		float3 bittan;
+		bittan = {-det*u2*e1.x + det*u1*e2.x, -det*u2*e1.y + det*u1*e2.y, -det*u2*e1.z + det*u1*e2.z};
+
+		result.pertubeMatrix = {{tangent.x, bittan.x, result.N.x}, {tangent.y, bittan.y, result.N.y}, {tangent.z, bittan.z, result.N.z}};
 	}
 
 	bool raytraceTriangle(HitInfo& result, const Ray& ray, const Triangle& tri, float tMin, float tMax) const {
@@ -683,6 +724,7 @@ public:
 		result.N = (1 - u - v) * tri.normals[0] + u * tri.normals[1] + v * tri.normals[2];
 		result.T = (1 - u - v) * tri.texcoords[0] + u * tri.texcoords[1] + v * tri.texcoords[2];
 		result.material = &materials[tri.idMaterial];
+		fillPertubeMatrix(result, tri);
 
 		return true;
 	}
@@ -767,7 +809,7 @@ public:
 			this->triangles[i].idMaterial = 0;
 			if (matid != nullptr) {
 				// read texture coordinates
-				if ((texcoords != nullptr) && materials[matid[i]].isTextured) {
+				if ((texcoords != nullptr) && (materials[matid[i]].isTextured||materials[matid[i]].hasBumpMap)) {
 					this->triangles[i].texcoords[0] = float2(texcoords[v0 * 2 + 0], texcoords[v0 * 2 + 1]);
 					this->triangles[i].texcoords[1] = float2(texcoords[v1 * 2 + 0], texcoords[v1 * 2 + 1]);
 					this->triangles[i].texcoords[2] = float2(texcoords[v2 * 2 + 0], texcoords[v2 * 2 + 1]);
@@ -853,6 +895,15 @@ private:
 		}
 	}
 
+	void loadBumpMap(const char* fname, const int i) {
+		int comp;
+		materials[i].bumpMap = stbi_load(fname, &materials[i].bumpWidth, &materials[i].bumpHeight, &comp, 3);
+		if (!materials[i].bumpMap) {
+			std::cerr << "Unable to load texture: " << fname << std::endl;
+			return;
+		}
+	}
+
 	std::string GetBaseDir(const std::string& filepath) {
 		if (filepath.find_last_of("/\\") != std::string::npos) return filepath.substr(0, filepath.find_last_of("/\\"));
 		return "";
@@ -900,6 +951,12 @@ private:
 				lineStr.erase(lineStr.size() - 1, 1);
 				materials[i - 1].isTextured = true;
 				loadTexture((base_dir + lineStr).c_str(), i - 1);
+			} else if (lineStr.compare(0, 6, "map_Bp", 0, 6) == 0)
+			{
+				lineStr.erase(0, 7);
+				lineStr.erase(lineStr.size() - 1, 1);
+				materials[i - 1].hasBumpMap = true;
+				loadBumpMap((base_dir + lineStr).c_str(), i - 1);
 			}
 		}
 
@@ -1432,230 +1489,6 @@ bool BVH::traverse(HitInfo& minHit, const Ray& ray, int node_id, float tMin, flo
 	return hit;
 }
 
-
-
-
-
-
-
-
-
-
-// ====== implement it in A3 ======
-// fill in the missing parts
-class Particle {
-public:
-	float3 position = float3(0.0f);
-	float3 velocity = float3(0.0f);
-	float3 prevPosition = position;
-	//
-	bool collision_box()
-	{
-		for(int i = 0; i<3; i++)
-		{
-			if(position[i]<-0.5||position[i]>0.5)
-			{
-				float shift = (position[i] < -0.5) ? (position[i]+0.5) : (position[i] - 0.5);
-				prevPosition[i] = position[i] + position[i]-prevPosition[i] - shift;
-				position[i] = position[i] - shift;
-				return true;
-			}
-		}
-		return false;
-	}
-
-	void collision_sphere()
-	{
-		float m = 0.5/length(position);
-		position = m*position;
-	}
-
-	void reset() {
-		position = float3(PCG32::rand(), PCG32::rand(), PCG32::rand()) - float(0.5f);
-		velocity = 2.0f * float3((PCG32::rand() - 0.5f), 0.0f, (PCG32::rand() - 0.5f));
-		prevPosition = position;
-		position += velocity * deltaT;
-	}
-
-	void step() {
-		float3 temp = position;
-
-		// === fill in this part in A3 ===
-		// update the particle position and velocity here
-		float3 newPosition = position + (position - prevPosition) +  (deltaT*deltaT)*globalGravity;
-		prevPosition = temp;
-		position = newPosition;
-		//while(collision_box());
-		//collision_sphere();
-	}
-
-	void step_box() {
-		step();
-		int i = 0;
-		while(collision_box() && i<10) i++;
-	}
-
-	void step_sphere() {
-		step();
-		collision_sphere();
-	}
-
-	void step_gravity(float3 gravityForce)
-	{
-		float3 temp = position;
-
-		// === fill in this part in A3 ===
-		// update the particle position and velocity here
-		float3 newPosition = position + (position - prevPosition) +  (deltaT*deltaT)*gravityForce/globalParticleMass;
-		prevPosition = temp;
-		position = newPosition;
-	}
-};
-
-
-class ParticleSystem {
-public:
-	std::vector<Particle> particles;
-	TriangleMesh particlesMesh;
-	TriangleMesh sphere;
-	const char* sphereMeshFilePath = 0;
-	float sphereSize = 0.0f;
-	ParticleSystem() {};
-
-	void updateMesh() {
-		// you can optionally update the other mesh information (e.g., bounding box, BVH - which is tricky)
-		if (sphereSize > 0) {
-			const int n = int(sphere.triangles.size());
-			for (int i = 0; i < globalNumParticles; i++) {
-				for (int j = 0; j < n; j++) {
-					particlesMesh.triangles[i * n + j].positions[0] = sphere.triangles[j].positions[0] + particles[i].position;
-					particlesMesh.triangles[i * n + j].positions[1] = sphere.triangles[j].positions[1] + particles[i].position;
-					particlesMesh.triangles[i * n + j].positions[2] = sphere.triangles[j].positions[2] + particles[i].position;
-					particlesMesh.triangles[i * n + j].normals[0] = sphere.triangles[j].normals[0];
-					particlesMesh.triangles[i * n + j].normals[1] = sphere.triangles[j].normals[1];
-					particlesMesh.triangles[i * n + j].normals[2] = sphere.triangles[j].normals[2];
-				}
-			}
-		} else {
-			const float particleSize = 0.005f;
-			for (int i = 0; i < globalNumParticles; i++) {
-				// facing toward the camera
-				particlesMesh.triangles[i].positions[0] = particles[i].position;
-				particlesMesh.triangles[i].positions[1] = particles[i].position + particleSize * globalUp;
-				particlesMesh.triangles[i].positions[2] = particles[i].position + particleSize * globalRight;
-				particlesMesh.triangles[i].normals[0] = -globalViewDir;
-				particlesMesh.triangles[i].normals[1] = -globalViewDir;
-				particlesMesh.triangles[i].normals[2] = -globalViewDir;
-			}
-		}
-	}
-
-	void initialize() {
-		particles.resize(globalNumParticles);
-		particlesMesh.materials.resize(1);
-		for (int i = 0; i < globalNumParticles; i++) {
-			particles[i].reset();
-		}
-
-		if (sphereMeshFilePath) {
-			if (sphere.load(sphereMeshFilePath)) {
-				particlesMesh.triangles.resize(sphere.triangles.size() * globalNumParticles);
-				sphere.preCalc();
-				sphereSize = sphere.bbox.get_size().x * 0.5f;
-			} else {
-				particlesMesh.triangles.resize(globalNumParticles);
-			}
-		} else {
-			particlesMesh.triangles.resize(globalNumParticles);
-		}
-		updateMesh();
-	}
-
-	float3 get_force(int i, int j)
-	{
-		float c = 2e-3f;
-		float3 v = particles[j].position - particles[i].position;
-		float dist = pow(length(v),3)+Epsilon;
-
-		return c/dist*v;
-	}
-
-	float3 accumulate_gravity(int i)
-	{
-		float3 totalForce = float3(0.0f);
-		for(int j = 0; j<globalNumParticles; j++)
-		{
-			if(j==i)
-				continue;
-
-			totalForce += get_force(i, j);
-		}
-
-		return totalForce;
-	}
-
-	void resolveCollision(int i, int j)
-	{
-		float dist = length(particles[i].position-particles[j].position);
-
-		if(dist > 2*sphereSize)
-			return;
-
-		float dp = 2*sphereSize - dist;
-		float3 direction = normalize(particles[i].position-particles[j].position);
-
-		float3 v1 = particles[i].position - particles[i].prevPosition;
-		float3 projection1 = dot(v1, direction)*direction;
-
-		float3 v2 = particles[j].position - particles[j].prevPosition;
-		float3 projection2 = dot(v2, direction)*direction;
-
-		v1 = v1 -projection1+projection2;
-		particles[i].prevPosition = particles[i].position-v1;
-
-		v2 = v2 - projection2+projection1;
-		particles[j].prevPosition = particles[j].position-v2;
-
-
-		particles[i].position += (dp/2.0f)*direction;
-		particles[i].prevPosition += (dp/2.0f)*direction;
-		particles[j].position -= (dp/2.0f)*direction;
-		particles[j].prevPosition -= (dp/2.0f)*direction;
-		//std::cout<<length(particles[i].position-particles[j].position)<<" "<<2*sphereSize<<"\n";
-	}
-
-	void itererateCollisions()
-	{
-		for(int k = 0; k<10; k++)
-		{
-			for(int i = 0; i<globalNumParticles; i++)
-			{
-				for(int j = i+1; j<globalNumParticles; j++)
-				{
-					resolveCollision(i,j);
-				}
-			}
-		}
-	}
-
-	void step() {
-		// add some particle-particle interaction here
-		// spherical particles can be implemented here
-		for (int i = 0; i < globalNumParticles; i++) {
-			//particles[i].step_gravity(accumulate_gravity(i));
-			particles[i].step();
-		}
-		//itererateCollisions();
-		updateMesh();
-	}
-};
-static ParticleSystem globalParticleSystem;
-
-
-
-
-
-
 static Image I;
 static float3 get_from_image(const float3& ray)
 {
@@ -1790,10 +1623,14 @@ static float3 reflection_shade(const HitInfo& hit, const float3& viewDir, const 
 }
 
 
-
-static float3 shade(const HitInfo& hit, const float3& viewDir, const int level) {
+static float3 shade(HitInfo& hit, const float3& viewDir, const int level) {
 	if(level==6)
 		return float3(0.0f, 0.0f, 0.0f);
+
+
+	if (hit.material->hasBumpMap) {
+		hit.N = mul(hit.pertubeMatrix, hit.material->fetchNormal(hit.T));;
+	}
 
 	if (hit.material->type == MAT_LAMBERTIAN) {
 		// you may want to add shadow ray tracing here in A2
@@ -1804,7 +1641,7 @@ static float3 shade(const HitInfo& hit, const float3& viewDir, const int level) 
 		for (int i = 0; i < globalScene.pointLightSources.size(); i++) {
 			// calculating the ray between light position and object hit point
 			float3 l = globalScene.pointLightSources[i]->position - hit.P;
-			return hit.material->BRDF(l, viewDir, hit.N) * PI;
+			// return hit.material->BRDF(l, viewDir, hit.N) * PI;
 			Ray r;
 			r.o = globalScene.pointLightSources[i]->position + Epsilon*hit.N; //moving point by small amount to avoid self-intersection
 			r.d = -normalize(l);
@@ -1991,9 +1828,6 @@ public:
 	}
 
 	void start() const {
-		if (globalEnableParticles) {
-			globalScene.addObject(&globalParticleSystem.particlesMesh);
-		}
 		globalScene.preCalc();
 
 		// main loop
@@ -2001,11 +1835,6 @@ public:
 			glfwPollEvents();
 			globalViewDir = normalize(globalLookat - globalEye);
 			globalRight = normalize(cross(globalViewDir, globalUp));
-
-			if (globalEnableParticles) {
-				globalParticleSystem.step();
-			}
-
 
 			if (globalRenderType == RENDER_RAYTRACE) {
 				globalScene.Raytrace();

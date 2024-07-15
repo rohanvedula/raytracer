@@ -36,6 +36,11 @@ using namespace linalg::aliases;
 #include <vector>
 #include <cfloat>
 
+// .h files
+#include "constants.h"
+#include "image.h"
+#include "material.h"
+
 
 // main window
 static GLFWwindow* globalGLFWindow;
@@ -43,68 +48,7 @@ static GLFWwindow* globalGLFWindow;
 
 // window size and resolution
 // (do not make it too large - will be slow!)
-constexpr int globalWidth = 512;
-constexpr int globalHeight = 384;
 
-
-// degree and radian
-constexpr float PI = 3.14159265358979f;
-constexpr float DegToRad = PI / 180.0f;
-constexpr float RadToDeg = 180.0f / PI;
-
-
-// for ray tracing
-constexpr float Epsilon = 5e-5f;
-
-
-// amount the camera moves with a mouse and a keyboard
-constexpr float ANGFACT = 0.2f;
-constexpr float SCLFACT = 0.1f;
-
-
-// fixed camera parameters
-constexpr float globalAspectRatio = float(globalWidth / float(globalHeight));
-constexpr float globalFOV = 45.0f; // vertical field of view
-constexpr float globalDepthMin = Epsilon; // for rasterization
-constexpr float globalDepthMax = 100.0f; // for rasterization
-constexpr float globalFilmSize = 0.032f; //for ray tracing
-const float globalDistanceToFilm = globalFilmSize / (2.0f * tan(globalFOV * DegToRad * 0.5f)); // for ray tracing
-
-
-// particle system related
-bool globalEnableParticles = false;
-constexpr float deltaT = 0.002f; // changed from 0.002f
-constexpr float globalParticleMass = 0.2;
-constexpr float3 globalGravity = float3(0.0f, -9.8f, 0.0f);
-constexpr int globalNumParticles = 20;
-
-
-// dynamic camera parameters
-float3 globalEye = float3(0.0f, 0.0f, 1.5f);
-float3 globalLookat = float3(0.0f, 0.0f, 0.0f);
-float3 globalUp = normalize(float3(0.0f, 1.0f, 0.0f));
-float3 globalViewDir; // should always be normalize(globalLookat - globalEye)
-float3 globalRight; // should always be normalize(cross(globalViewDir, globalUp));
-bool globalShowRaytraceProgress = false; // for ray tracing
-
-
-// mouse event
-static bool mouseLeftPressed;
-static double m_mouseX = 0.0;
-static double m_mouseY = 0.0;
-
-
-// rendering algorithm
-enum enumRenderType {
-	RENDER_RASTERIZE,
-	RENDER_RAYTRACE,
-	RENDER_IMAGE,
-};
-enumRenderType globalRenderType = RENDER_IMAGE;
-int globalFrameCount = 0;
-static bool globalRecording = false;
-static GifWriter globalGIFfile;
-constexpr int globalGIFdelay = 1;
 
 
 // OpenGL related data (do not modify it if it is working)
@@ -141,96 +85,6 @@ namespace PCG32 {
 		return float(double(pcg32_fast()) / 4294967296.0);
 	}
 }
-
-
-
-// image with a depth buffer
-// (depth buffer is not always needed, but hey, we have a few GB of memory, so it won't be an issue...)
-class Image {
-public:
-	std::vector<float3> pixels;
-	std::vector<float> depths;
-	int width = 0, height = 0;
-
-	static float toneMapping(const float r) {
-		// you may want to implement better tone mapping
-		return std::max(std::min(1.0f, r), 0.0f);
-	}
-
-	static float gammaCorrection(const float r, const float gamma = 1.0f) {
-		// assumes r is within 0 to 1
-		// gamma is typically 2.2, but the default is 1.0 to make it linear
-		return pow(r, 1.0f / gamma);
-	}
-
-	void resize(const int newWdith, const int newHeight) {
-		this->pixels.resize(newWdith * newHeight);
-		this->depths.resize(newWdith * newHeight);
-		this->width = newWdith;
-		this->height = newHeight;
-	}
-
-	void clear() {
-		for (int j = 0; j < height; j++) {
-			for (int i = 0; i < width; i++) {
-				this->pixel(i, j) = float3(0.0f);
-				this->depth(i, j) = FLT_MAX;
-			}
-		}
-	}
-
-	Image(int _width = 0, int _height = 0) {
-		this->resize(_width, _height);
-		this->clear();
-	}
-
-	bool valid(const int i, const int j) const {
-		return (i >= 0) && (i < this->width) && (j >= 0) && (j < this->height);
-	}
-
-	float& depth(const int i, const int j) {
-		return this->depths[i + j * width];
-	}
-
-	float3& pixel(const int i, const int j) {
-		// optionally can check with "valid", but it will be slow
-		return this->pixels[i + j * width];
-	}
-
-	void load(const char* fileName) {
-		int comp, w, h;
-		float* buf = stbi_loadf(fileName, &w, &h, &comp, 3);
-		if (!buf) {
-			std::cerr << "Unable to load: " << fileName << std::endl;
-			return;
-		}
-
-		this->resize(w, h);
-		int k = 0;
-		for (int j = height - 1; j >= 0; j--) {
-			for (int i = 0; i < width; i++) {
-				this->pixels[i + j * width] = float3(buf[k], buf[k + 1], buf[k + 2]);
-				k += 3;
-			}
-		}
-		delete[] buf;
-		printf("Loaded \"%s\".\n", fileName);
-	}
-	void save(const char* fileName) {
-		unsigned char* buf = new unsigned char[width * height * 3];
-		int k = 0;
-		for (int j = height - 1; j >= 0; j--) {
-			for (int i = 0; i < width; i++) {
-				buf[k++] = (unsigned char)(255.0f * gammaCorrection(toneMapping(pixel(i, j).x)));
-				buf[k++] = (unsigned char)(255.0f * gammaCorrection(toneMapping(pixel(i, j).y)));
-				buf[k++] = (unsigned char)(255.0f * gammaCorrection(toneMapping(pixel(i, j).z)));
-			}
-		}
-		stbi_write_png(fileName, width, height, 3, buf, width * 3);
-		delete[] buf;
-		printf("Saved \"%s\".\n", fileName);
-	}
-};
 
 // main image buffer to be displayed
 Image FrameBuffer(globalWidth, globalHeight);
@@ -400,122 +254,6 @@ public:
 // uber material
 // "type" will tell the actual type
 // ====== implement it in A2, if you want ======
-enum enumMaterialType {
-	MAT_LAMBERTIAN,
-	MAT_METAL,
-	MAT_GLASS
-};
-class Material {
-public:
-	std::string name;
-
-	enumMaterialType type = MAT_LAMBERTIAN;
-	float eta = 1.0f;
-	float glossiness = 1.0f;
-
-	float3 Ka = float3(0.0f);
-	float3 Kd = float3(0.9f);
-	float3 Ks = float3(0.0f);
-	float Ns = 0.0;
-
-	// support 8-bit texture
-	bool isTextured = false;
-	unsigned char* texture = nullptr;
-	int textureWidth = 0;
-	int textureHeight = 0;
-
-	bool hasBumpMap = false;
-	unsigned char* bumpMap = nullptr;
-	int bumpWidth = 0;
-	int bumpHeight = 0;
-
-	Material() {};
-	virtual ~Material() {};
-
-	void setReflectance(const float3& c) {
-		if (type == MAT_LAMBERTIAN) {
-			Kd = c;
-		} else if (type == MAT_METAL) {
-			// empty
-		} else if (type == MAT_GLASS) {
-			// empty
-		}
-	}
-
-	float3 fetchTexture(const float2& tex) const {
-		// repeating
-		int x = int(tex.x * textureWidth) % textureWidth;
-		int y = int(tex.y * textureHeight) % textureHeight;
-		if (x < 0) x += textureWidth;
-		if (y < 0) y += textureHeight;
-
-		int pix = (x + y * textureWidth) * 3;
-		const unsigned char r = texture[pix + 0];
-		const unsigned char g = texture[pix + 1];
-		const unsigned char b = texture[pix + 2];
-		return float3(r, g, b) / 255.0f;
-	}
-
-	float3 fetchNormal(const float2& nor) const {
-		// repeating
-		int x = int(nor.x * bumpWidth) % bumpWidth;
-		int y = int(nor.y * bumpHeight) % bumpHeight;
-		if (x < 0) x += bumpWidth;
-		if (y < 0) y += bumpHeight;
-
-		int pix = (x + y * bumpWidth) * 3;
-		const unsigned char r = bumpMap[pix + 0];
-		const unsigned char g = bumpMap[pix + 1];
-		const unsigned char b = bumpMap[pix + 2];
-		return normalize(float3(r, g, b)/127.5f+float3(1.0f));
-	}
-
-	float3 BRDF(const float3& wi, const float3& wo, const float3& n) const {
-		float3 brdfValue = float3(0.0f);
-		if (type == MAT_LAMBERTIAN) {
-			// BRDF
-			brdfValue = Kd / PI;
-		} else if (type == MAT_METAL) {
-			// empty
-		} else if (type == MAT_GLASS) {
-			// empty
-		}
-		return brdfValue;
-	};
-
-	float PDF(const float3& wGiven, const float3& wSample) const {
-		// probability density function for a given direction and a given sample
-		// it has to be consistent with the sampler
-		float pdfValue = 0.0f;
-		if (type == MAT_LAMBERTIAN) {
-			// empty
-		} else if (type == MAT_METAL) {
-			// empty
-		} else if (type == MAT_GLASS) {
-			// empty
-		}
-		return pdfValue;
-	}
-
-	float3 sampler(const float3& wGiven, float& pdfValue) const {
-		// sample a vector and record its probability density as pdfValue
-		float3 smp = float3(0.0f);
-		if (type == MAT_LAMBERTIAN) {
-			// empty
-		} else if (type == MAT_METAL) {
-			// empty
-		} else if (type == MAT_GLASS) {
-			// empty
-		}
-
-		pdfValue = PDF(wGiven, smp);
-		return smp;
-	}
-};
-
-
-
-
 
 class HitInfo {
 public:
@@ -809,7 +547,7 @@ public:
 			this->triangles[i].idMaterial = 0;
 			if (matid != nullptr) {
 				// read texture coordinates
-				if ((texcoords != nullptr) && (materials[matid[i]].isTextured||materials[matid[i]].hasBumpMap)) {
+				if ((texcoords != nullptr) && (materials[matid[i]].isTextured||materials[matid[i]].hasBumpMap||materials[matid[i]].perlinTexture)) {
 					this->triangles[i].texcoords[0] = float2(texcoords[v0 * 2 + 0], texcoords[v0 * 2 + 1]);
 					this->triangles[i].texcoords[1] = float2(texcoords[v1 * 2 + 0], texcoords[v1 * 2 + 1]);
 					this->triangles[i].texcoords[2] = float2(texcoords[v2 * 2 + 0], texcoords[v2 * 2 + 1]);
@@ -957,6 +695,10 @@ private:
 				lineStr.erase(lineStr.size() - 1, 1);
 				materials[i - 1].hasBumpMap = true;
 				loadBumpMap((base_dir + lineStr).c_str(), i - 1);
+			} else if (lineStr.compare(0, 6, "perlin", 0, 6) == 0)
+			{
+				lineStr.erase(0, 7);
+				materials[i - 1].perlinTexture = true;
 			}
 		}
 
@@ -1665,6 +1407,10 @@ static float3 shade(HitInfo& hit, const float3& viewDir, const int level) {
 
 			if (hit.material->isTextured) {
 				brdf *= hit.material->fetchTexture(hit.T);
+			}
+
+			if (hit.material->perlinTexture) {
+				brdf *= hit.material->fetchPerlinTexture(hit.T);
 			}
 			// return brdf * PI; //debug output
 

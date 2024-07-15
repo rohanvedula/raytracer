@@ -11,7 +11,10 @@ file(GLOB SRC_FILES
         src/*.cpp)
 
 add_executable(CS488
-        ${SRC_FILES})
+        ${SRC_FILES}
+        src/constants.h
+        src/image.h
+        src/material.h)
 
 target_include_directories(CS488 PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/external/glfw/include)
 target_include_directories(CS488 PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/external/glew/include)

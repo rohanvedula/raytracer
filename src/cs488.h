@@ -45,6 +45,9 @@ using namespace linalg::aliases;
 // main window
 static GLFWwindow* globalGLFWindow;
 
+static float ApertureRadius = 0.00012f;
+static int NUM_RAYS = 1;
+
 
 // window size and resolution
 // (do not make it too large - will be slow!)
@@ -1280,8 +1283,20 @@ public:
 		return hit;
 	}
 
+	static float2 randomAperture(int itr)
+	{
+		if(itr==0)
+			return float2(0.0f);
+
+		float angle = PCG32::rand()*2.0f * PI;
+		float radius = PCG32::rand();
+
+		float2 offset = float2(cos(angle), sin(angle)) * radius * ApertureRadius;
+		return offset;
+	}
+
 	// eye ray generation (given to you for A2)
-	Ray eyeRay(int x, int y) const {
+	Ray eyeRay(int x, int y, int itr) const {
 		// compute the camera coordinate system 
 		const float3 wDir = normalize(float3(-globalViewDir));
 		const float3 uDir = normalize(cross(globalUp, wDir));
@@ -1294,28 +1309,30 @@ public:
 
 		const float3 pixelPos = globalEye + float(globalAspectRatio * globalFilmSize * imPlaneUPos) * uDir + float(globalFilmSize * imPlaneVPos) * vDir - globalDistanceToFilm * wDir;
 
-		return Ray(globalEye, normalize(pixelPos - globalEye));
+		float2 apertureOffset = randomAperture(itr);
+		float3 aperturePos = globalEye + apertureOffset.x * uDir + apertureOffset.y * vDir;
+
+		return Ray(aperturePos, normalize(pixelPos - aperturePos));
 	}
 
 	// ray tracing (you probably don't need to change it in A2)
 	void Raytrace() const {
 		FrameBuffer.clear();
-
 		// loop over all pixels in the image
 		for (int j = 0; j < globalHeight; ++j) {
 			for (int i = 0; i < globalWidth; ++i) {
-				const Ray ray = eyeRay(i, j);
-				HitInfo hitInfo;
-				if (intersect(hitInfo, ray)) {
-					FrameBuffer.pixel(i, j) = shade(hitInfo, -ray.d);
-				} else {
-					if(I.width!=0)
-					{
-						FrameBuffer.pixel(i, j) = get_from_image(ray.d);
+				float3 pixel_value = float3(0.0f);
+				for(int k = 0; k < NUM_RAYS; ++k)
+				{
+					const Ray ray = eyeRay(i, j,k);
+					HitInfo hitInfo;
+					if (intersect(hitInfo, ray)) {
+						pixel_value += shade(hitInfo, -ray.d);
+					} else {
+						pixel_value += (I.width != 0) ? get_from_image(ray.d) : float3(0.0f);
 					}
-					else
-						FrameBuffer.pixel(i, j) = float3(0.0f);
 				}
+				FrameBuffer.pixel(i, j) = pixel_value/NUM_RAYS;
 			}
 
 			// show intermediate process
@@ -1571,6 +1588,16 @@ public:
 	void load_image(const char* filepath)
 	{
 		I.load(filepath);
+	}
+
+	void set_apeture(const float s)
+	{
+		ApertureRadius = s;
+	}
+
+	void set_num_ray(const int n)
+	{
+		NUM_RAYS = n;
 	}
 
 	void start() const {

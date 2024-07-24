@@ -1392,48 +1392,6 @@ static float3 reflection_shade(const HitInfo& hit, const float3& viewDir, const 
 	return hit.material->Ks*shade(reflectedHit, -reflectedRayDir, level+1);
 }
 
-float mod289(float x){return x - floor(x * (1.0f / 289.0f)) * 289.0f;}
-float4 mod289(float4 x){return x - floor(x * (1.0f / 289.0f)) * 289.0f;}
-float4 perm(float4 x){return mod289(((x * 34.0f) + 1.0f) * x);}
-float4 fract4(float4 x) {return x - floor(x);}
-
-float noise2(float3 p){
-	float3 a = floor(p);
-	float3 d = p - a;
-	d = d * d * (3.0f - 2.0f * d);
-
-	float4 b = float4(a.x, a.x, a.y, a.y) + float4(0.0, 1.0, 0.0, 1.0);
-	float4 k1 = perm(float4(b.x, b.y, b.x, b.y));
-	float4 k2 = perm(float4(k1.x, k1.y, k1.x, k1.y) + float4(b.z, b.z, b.w, b.w));
-
-	float4 c = k2 + float4(a.z, a.z, a.z, a.z);
-	float4 k3 = perm(c);
-	float4 k4 = perm(c + 1.0f);
-
-	float4 o1 = fract4(k3 * (1.0f / 41.0f));
-	float4 o2 = fract4(k4 * (1.0f / 41.0f));
-
-	float4 o3 = o2 * d.z + o1 * (1.0f - d.z);
-	float2 o4 = float2(o3.y, o3.w) * d.x + float2(o3.x, o3.z) * (1.0f - d.x);
-
-	return o4.y * d.y + o4.x * (1.0 - d.y);
-}
-
-float fbm2(float3 p) {
-	float total = 0.0;
-	float amplitude = 0.5;
-	float frequency = 1.0;
-	const int octaves = 4;
-
-	for (int i = 0; i < octaves; i++) {
-		total += noise2(p * frequency) * amplitude;
-		frequency *= 2.0;
-		amplitude *= 0.5;
-	}
-
-	return total;
-}
-
 // Function to fade the input value
 
 static float beerLambert(float absorb, float marchSize)
@@ -1481,21 +1439,21 @@ static float3 cloud_shade(HitInfo& hit, const float3& viewDir, const int level)
 			float m = 1;// phase(viewDir, -l, -0.85);
 			float3 lightC = hit.material->BRDF(l, viewDir, hit.N) * PI * m;
 
-			 Ray r(position, l);
-			 HitInfo tempHit;
-			 // find intersection between light ray
-			 bool haveHit = globalScene.intersect(tempHit, r);
-			 float distanceInCloud = tempHit.t;
-			if(haveHit)
-			{
-				lightC *= beerLambert(absorptionCoefficient*1.0f, distanceInCloud);
+			Ray r(position, l);
+			HitInfo tempHit;
+			// find intersection between light ray
+			bool haveHit = globalScene.intersect(tempHit, r);
+			float distanceInCloud = tempHit.t;
+			if(haveHit){
+				lightC *= beerLambert(absorptionCoefficient, distanceInCloud);
 			}
 			volumetricC += d * lightC;
 		}
 	}
-	volumetricC *= 1.8f;
+	volumetricC *= 1.2f;
 	volumetricC = clamp(volumetricC, 0.0f, 1.0f);
 	return backgroundColor * (1-volumetricC.x) + float3(1.0f) * volumetricC.x;
+	//return backgroundColor * (opaqueVisiblity) + volumetricC * (1-opaqueVisiblity);
 }
 
 

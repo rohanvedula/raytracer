@@ -15,6 +15,7 @@ add_executable(CS488
         src/constants.h
         src/image.h
         src/material.h
+        src/perlin.h
 )
 
 target_include_directories(CS488 PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/external/glfw/include)

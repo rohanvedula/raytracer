@@ -8,7 +8,8 @@
 enum enumMaterialType {
 	MAT_LAMBERTIAN,
 	MAT_METAL,
-	MAT_GLASS
+	MAT_GLASS,
+	MAT_CLOUD
 };
 
 const int GRID_SIZE = 400;
@@ -92,6 +93,7 @@ public:
 	float3 Kd = float3(0.9f);
 	float3 Ks = float3(0.0f);
 	float Ns = 0.0;
+	float opacity = -1.0;
 
 	// support 8-bit texture
 	bool isTextured = false;
@@ -149,7 +151,7 @@ public:
 
 	float3 BRDF(const float3& wi, const float3& wo, const float3& n) const {
 		float3 brdfValue = float3(0.0f);
-		if (type == MAT_LAMBERTIAN) {
+		if (type == MAT_LAMBERTIAN || type == MAT_CLOUD) {
 			// BRDF
 			brdfValue = Kd / PI;
 		} else if (type == MAT_METAL) {

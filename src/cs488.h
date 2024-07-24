@@ -40,6 +40,7 @@ using namespace linalg::aliases;
 #include "constants.h"
 #include "image.h"
 #include "material.h"
+#include "perlin.h"
 
 
 // main window
@@ -516,6 +517,10 @@ public:
 					materials[i].type = MAT_GLASS;
 					materials[i].eta = 1.5f;
 				}
+				if (materials[i].opacity!=-1.0f)
+				{
+					materials[i].type = MAT_CLOUD;
+				}
 			}
 		} else {
 			// use default Lambertian
@@ -657,7 +662,6 @@ private:
 		Material mtl;
 		mtl.texture = nullptr;
 		char line[81];
-		std::cout<<"Printing file: "<< fileName<<"\n";
 		while (fgets(line, 80, fp) != nullptr) {
 			float r, g, b, s;
 			std::string lineStr;
@@ -702,7 +706,13 @@ private:
 			{
 				lineStr.erase(0, 7);
 				materials[i - 1].perlinTexture = true;
+			} else if (lineStr.compare(0, 7, "opacity", 0, 7) == 0)
+			{
+				lineStr.erase(0, 8);
+				lineStr.erase(lineStr.size() - 1, 1);
+				materials[i - 1].opacity = std::stof(lineStr);
 			}
+
 		}
 
 		fclose(fp);
@@ -1329,7 +1339,7 @@ public:
 					if (intersect(hitInfo, ray)) {
 						pixel_value += shade(hitInfo, -ray.d);
 					} else {
-						pixel_value += (I.width != 0) ? get_from_image(ray.d) : float3(0.0f);
+						pixel_value += (I.width != 0) ? get_from_image(ray.d) : backgroundColor;
 					}
 				}
 				FrameBuffer.pixel(i, j) = pixel_value/NUM_RAYS;
@@ -1347,6 +1357,7 @@ public:
 				}
 			}
 		}
+		std::cout<<"DONE\n";
 	}
 
 };
@@ -1379,6 +1390,112 @@ static float3 reflection_shade(const HitInfo& hit, const float3& viewDir, const 
 	//recursive call, increasing the depth by 1 and multiplying by Ks, reflect ray direction to stanardize
 	// since viewDir is pointing out of hitObject, reflectedRay should be negated
 	return hit.material->Ks*shade(reflectedHit, -reflectedRayDir, level+1);
+}
+
+float mod289(float x){return x - floor(x * (1.0f / 289.0f)) * 289.0f;}
+float4 mod289(float4 x){return x - floor(x * (1.0f / 289.0f)) * 289.0f;}
+float4 perm(float4 x){return mod289(((x * 34.0f) + 1.0f) * x);}
+float4 fract4(float4 x) {return x - floor(x);}
+
+float noise2(float3 p){
+	float3 a = floor(p);
+	float3 d = p - a;
+	d = d * d * (3.0f - 2.0f * d);
+
+	float4 b = float4(a.x, a.x, a.y, a.y) + float4(0.0, 1.0, 0.0, 1.0);
+	float4 k1 = perm(float4(b.x, b.y, b.x, b.y));
+	float4 k2 = perm(float4(k1.x, k1.y, k1.x, k1.y) + float4(b.z, b.z, b.w, b.w));
+
+	float4 c = k2 + float4(a.z, a.z, a.z, a.z);
+	float4 k3 = perm(c);
+	float4 k4 = perm(c + 1.0f);
+
+	float4 o1 = fract4(k3 * (1.0f / 41.0f));
+	float4 o2 = fract4(k4 * (1.0f / 41.0f));
+
+	float4 o3 = o2 * d.z + o1 * (1.0f - d.z);
+	float2 o4 = float2(o3.y, o3.w) * d.x + float2(o3.x, o3.z) * (1.0f - d.x);
+
+	return o4.y * d.y + o4.x * (1.0 - d.y);
+}
+
+float fbm2(float3 p) {
+	float total = 0.0;
+	float amplitude = 0.5;
+	float frequency = 1.0;
+	const int octaves = 4;
+
+	for (int i = 0; i < octaves; i++) {
+		total += noise2(p * frequency) * amplitude;
+		frequency *= 2.0;
+		amplitude *= 0.5;
+	}
+
+	return total;
+}
+
+// Function to fade the input value
+
+static float beerLambert(float absorb, float marchSize)
+{
+	return exp(-absorb * marchSize);
+}
+
+static float phase(float3 v, float3 l, float g) {
+	float cosTheta = dot(v, l);
+	float g2 = g * g;
+	float denominator = pow(1.0 + g2 - 2.0 * g * cosTheta, 1.5);
+	return (1.0 - g2) / (4.0 * PI * denominator);
+}
+
+
+static float3 cloud_shade(HitInfo& hit, const float3& viewDir, const int level)
+{
+	float absorptionCoefficient = hit.material->opacity;
+	float opaqueVisiblity = 1.0f;
+	const float marchSize = 1.1f;
+	float volumeDepth = 0.0f;
+
+	Ray newRay(hit.P - hit.N*Epsilon, -viewDir);
+	HitInfo nextHit;
+	globalScene.intersect(nextHit, newRay);
+
+	float totalDepth = nextHit.t;
+	float3 volumetricC = float3(0.0f);
+	int itr = 0;
+
+	for(int i = 0; i < maxMarchSteps; i++)
+	{
+		volumeDepth += marchSize;
+		if(volumeDepth > totalDepth)
+			break;
+
+		float3 position = hit.P - hit.N*Epsilon - viewDir*volumeDepth;
+		itr+=1;
+		float p = opaqueVisiblity;
+		opaqueVisiblity *= beerLambert(absorptionCoefficient, marchSize);
+		float d = p - opaqueVisiblity;
+		for (int i = 0; i < globalScene.pointLightSources.size(); i++)
+		{
+			float3 l = normalize(globalScene.pointLightSources[i]->position - position);
+			float m = 1;// phase(viewDir, -l, -0.85);
+			float3 lightC = hit.material->BRDF(l, viewDir, hit.N) * PI * m;
+
+			 Ray r(position, l);
+			 HitInfo tempHit;
+			 // find intersection between light ray
+			 bool haveHit = globalScene.intersect(tempHit, r);
+			 float distanceInCloud = tempHit.t;
+			if(haveHit)
+			{
+				lightC *= beerLambert(absorptionCoefficient*1.0f, distanceInCloud);
+			}
+			volumetricC += d * lightC;
+		}
+	}
+	volumetricC *= 1.8f;
+	volumetricC = clamp(volumetricC, 0.0f, 1.0f);
+	return backgroundColor * (1-volumetricC.x) + float3(1.0f) * volumetricC.x;
 }
 
 
@@ -1477,6 +1594,9 @@ static float3 shade(HitInfo& hit, const float3& viewDir, const int level) {
 
 		//recusive call, increase depth
 		return hit.material->Ks*shade(refractedHit, -refractedRay.d, level+1);
+	} else if(hit.material->type == MAT_CLOUD)
+	{
+		return cloud_shade(hit, viewDir, level);
 	} else {
 		// something went wrong - make it apparent that it is an error
 		return float3(100.0f, 0.0f, 100.0f);

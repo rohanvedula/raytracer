@@ -1456,6 +1456,16 @@ static float3 cloud_shade(HitInfo& hit, const float3& viewDir, const int level)
 	//return backgroundColor * (opaqueVisiblity) + volumetricC * (1-opaqueVisiblity);
 }
 
+static float fresnel(HitInfo& hit, const float3& ray, float3& normal) {
+	float cosTheta = dot(ray, normal);
+	float eta = hit.material->eta;
+
+	float R0 = pow((1.0f - eta) / (1.0f + eta), 2.0f);
+	// Use Schlick's approximation
+	float R = R0 + (1.0f - R0) * pow(1.0f + cosTheta, 5.0f);
+
+	return R;
+}
 
 static float3 shade(HitInfo& hit, const float3& viewDir, const int level) {
 	if(level==6)
@@ -1475,7 +1485,7 @@ static float3 shade(HitInfo& hit, const float3& viewDir, const int level) {
 		for (int i = 0; i < globalScene.pointLightSources.size(); i++) {
 			// calculating the ray between light position and object hit point
 			float3 l = globalScene.pointLightSources[i]->position - hit.P;
-			// return hit.material->BRDF(l, viewDir, hit.N) * PI;
+			return hit.material->BRDF(l, viewDir, hit.N) * PI;
 			Ray r;
 			r.o = globalScene.pointLightSources[i]->position + Epsilon*hit.N; //moving point by small amount to avoid self-intersection
 			r.d = -normalize(l);
@@ -1551,7 +1561,8 @@ static float3 shade(HitInfo& hit, const float3& viewDir, const int level) {
 		}
 
 		//recusive call, increase depth
-		return hit.material->Ks*shade(refractedHit, -refractedRay.d, level+1);
+		float R = fresnel(hit, -viewDir, normal);
+		return R*reflection_shade(hit, viewDir, level, dot(-viewDir, hit.N)>=0) + (1-R)*hit.material->Ks*shade(refractedHit, -refractedRay.d, level+1);
 	} else if(hit.material->type == MAT_CLOUD)
 	{
 		return cloud_shade(hit, viewDir, level);

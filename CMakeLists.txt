@@ -16,6 +16,12 @@ add_executable(CS488
         src/image.h
         src/material.h
         src/perlin.h
+        src/structures.h
+        src/aabb.h
+        src/trianglemesh.h
+        src/bvh.h
+        src/scene.h
+        src/randomnum.h
 )
 
 target_include_directories(CS488 PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/external/glfw/include)

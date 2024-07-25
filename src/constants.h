@@ -4,6 +4,7 @@
 
 #ifndef CONSTANTS_H
 #define CONSTANTS_H
+#include "image.h"
 
 constexpr int globalWidth = 512;
 constexpr int globalHeight = 384;
@@ -55,6 +56,12 @@ static bool mouseLeftPressed;
 static double m_mouseX = 0.0;
 static double m_mouseY = 0.0;
 const int GRID_SIZE = 400;
+
+
+static float ApertureRadius = 0.00012f;
+static int NUM_RAYS = 1;
+Image FrameBuffer(globalWidth, globalHeight);
+Image AccumulationBuffer(globalWidth, globalHeight);
 
 
 // rendering algorithm

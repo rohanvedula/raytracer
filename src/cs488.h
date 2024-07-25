@@ -341,9 +341,9 @@ static float3 shade(HitInfo& hit, const float3& viewDir, const int level) {
 		for (int i = 0; i < globalScene.pointLightSources.size(); i++) {
 			// calculating the ray between light position and object hit point
 			float3 l = globalScene.pointLightSources[i]->position - hit.P;
-			return hit.material->BRDF(l, viewDir, hit.N) * PI;
+			//return hit.material->BRDF(l, viewDir, hit.N) * PI;
 			Ray r;
-			r.o = globalScene.pointLightSources[i]->position + Epsilon*hit.N; //moving point by small amount to avoid self-intersection
+			r.o = globalScene.pointLightSources[i]->position + 3*Epsilon*hit.N; //moving point by small amount to avoid self-intersection
 			r.d = -normalize(l);
 			HitInfo tempHit;
 			float m = length(l);

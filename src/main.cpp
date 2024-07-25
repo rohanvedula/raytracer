@@ -4,17 +4,19 @@ CS488Window CS488;
 
 // setting up lighting
 static PointLightSource light;
-// static PointLightSource light2;
 static void setupLightSource() {
-    //light.position = float3(0.5f, 4.0f, 1.0f); // use this for sponza.obj
-    light.position = float3(150.0f, 150.0f, 100.0f);
-    //light.position = float3(0.0f, 5.0f, 3.0f);
-    light.wattage = float3(1000000.0f, 1000000.0f, 1000000.0f);
-    globalScene.addLight(&light);
+    //cloud
+    //light.position = float3(150.0f, 150.0f, 100.0f);
+    //light.wattage = float3(1000000.0f, 1000000.0f, 1000000.0f);
 
-    // light2.position = float3(3.0f, 3.0f, -10.0f);
-    // light2.wattage = float3(1000.0f, 1000.0f, 1000.0f);
-    // globalScene.addLight(&light2);
+    //multisphere
+    light.position = float3(0.0f, 300.0f, 100.0f);
+    light.wattage = float3(3000000.0f, 3000000.0f, 3000000.0f);
+
+    //normal
+    // light.position = float3(3.0f, 3.0f, 3.0f);
+    // light.wattage = float3(1000.0f, 1000.0f, 1000.0f);
+    globalScene.addLight(&light);
 }
 
 

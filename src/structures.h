@@ -6,6 +6,7 @@
 #define STRUCTURES_H
 
 #include "material.h"
+#include "randomnum.h"
 
 class HitInfo {
 public:
@@ -21,6 +22,24 @@ public:
 class PointLightSource {
 public:
     float3 position, wattage;
+    float radius = 50.0f;
+
+    float3 getRandomPoint(int i)
+    {
+        if(i==0)
+            return position;
+
+        float theta = PCG32::rand()* 2.0f * M_PI; // Azimuthal angle
+        float phi = acos(2.0f * PCG32::rand() - 1.0f); // Polar angle
+
+        // Convert spherical coordinates to Cartesian coordinates
+        float x = radius * sin(phi) * cos(theta);
+        float y = radius * sin(phi) * sin(theta);
+        float z = radius * cos(phi);
+
+        // Return the sampled point on the sphere translated by the sphere's center position P
+        return float3(x, y, z) + position;
+    }
 };
 
 

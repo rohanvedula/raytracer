@@ -324,11 +324,11 @@ static float fresnel(HitInfo& hit, const float3& ray, const float3& normal) {
 }
 
 
-static float inShadow(const HitInfo& hit, const PointLightSource& light)
+static float inShadow(const HitInfo& hit, const float3& lightPosition)
 {
-	float3 l = light.position - hit.P;
+	float3 l = lightPosition - hit.P;
 	Ray r;
-	r.o = light.position + 3*Epsilon*hit.N; //moving point by small amount to avoid self-intersection
+	r.o = lightPosition + 3*Epsilon*hit.N; //moving point by small amount to avoid self-intersection
 	r.d = -normalize(l);
 	HitInfo tempHit;
 	float m = length(l);
@@ -337,8 +337,22 @@ static float inShadow(const HitInfo& hit, const PointLightSource& light)
 
 	//boolean for if there is a hit before our current hit (which is distance m away)
 	bool is_hit = tempHit.t<m;
-	return is_hit;
+	return not is_hit;
 }
+
+
+static float getAverageShadow(const HitInfo& hit, PointLightSource& light)
+{
+	float total_light = 0.0f;
+	int iterations = 1;
+
+	for(int i = 0; i<iterations; i++)
+	{
+		total_light+=inShadow(hit, light.getRandomPoint(i));
+	}
+	return total_light/iterations;
+}
+
 
 float3 lerp(const float3& a, const float3& b, float t) {
 	return a * (1.0f - t) + b * t;
@@ -363,7 +377,7 @@ static float3 shade(HitInfo& hit, const float3& viewDir, const int level) {
 			// calculating the ray between light position and object hit point
 			float3 l = globalScene.pointLightSources[i]->position - hit.P;
 			//return hit.material->BRDF(l, viewDir, hit.N) * PI;
-			bool shadow = inShadow(hit, *globalScene.pointLightSources[i]);
+			float shadow = getAverageShadow(hit, *globalScene.pointLightSources[i]);
 
 			// the inverse-squared falloff
 			const float falloff = length2(l);
@@ -386,7 +400,7 @@ static float3 shade(HitInfo& hit, const float3& viewDir, const int level) {
 			float fog_disperstion = beerLambert(fogAbsorbtion, hit.t);
 
 			//multiply irridecence which is 0 if there is no earlier hit and 1 otherwise
-			float3 pointInFog = fog_disperstion*(1-int(shadow))*irradiance * brdf;
+			float3 pointInFog = fog_disperstion*shadow*irradiance * brdf;
 			L += lerp(backgroundColor, pointInFog, fog_disperstion);
 		}
 		return L;

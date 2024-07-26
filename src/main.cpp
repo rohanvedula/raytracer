@@ -1,6 +1,6 @@
-#include "cs488.h"
+#include "controller.h"
 #include <string>
-CS488Window CS488;
+Runner runner;
 
 // setting up lighting
 static PointLightSource light;
@@ -45,13 +45,13 @@ static void parseCommandLine(int argc, const char* argv[])
     for(int i = 0; i<argc-1; i++)
     {
         if(!strcmp(argv[i],"-load_back"))
-            CS488.load_image(argv[i+1]);
+            runner.load_image(argv[i+1]);
         else if(!strcmp(argv[i],"-apeture"))
-            CS488.set_apeture(std::stof(argv[i+1]));
+            runner.set_apeture(std::stof(argv[i+1]));
         else if(!strcmp(argv[i],"-ray_cast"))
-            CS488.set_num_ray(atoi(argv[i+1]));
+            runner.set_num_ray(atoi(argv[i+1]));
         else if(!strcmp(argv[i],"-fog"))
-            CS488.set_fog(std::stof(argv[i+1]));
+            runner.set_fog(std::stof(argv[i+1]));
     }
 }
 
@@ -66,5 +66,5 @@ int main(int argc, const char* argv[]) {
     setup(argc, argv);
     parseCommandLine(argc, argv);
 
-    CS488.start();
+    runner.start();
 }

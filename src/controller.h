@@ -531,15 +531,15 @@ public:
 
 // main window
 // you probably do not need to modify this in A0 to A3.
-class CS488Window {
+class Runner {
 public:
 	// put this first to make sure that the glInit's constructor is called before the one for CS488Window
 	OpenGLInit glInit;
 
-	CS488Window()
+	Runner()
 	{
 	}
-	virtual ~CS488Window() {}
+	virtual ~Runner() {}
 
 	void(*process)() = NULL;
 

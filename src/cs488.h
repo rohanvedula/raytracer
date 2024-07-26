@@ -323,6 +323,27 @@ static float fresnel(HitInfo& hit, const float3& ray, const float3& normal) {
 	return R;
 }
 
+
+static float inShadow(const HitInfo& hit, const PointLightSource& light)
+{
+	float3 l = light.position - hit.P;
+	Ray r;
+	r.o = light.position + 3*Epsilon*hit.N; //moving point by small amount to avoid self-intersection
+	r.d = -normalize(l);
+	HitInfo tempHit;
+	float m = length(l);
+	//find intersection between light ray
+	globalScene.intersect(tempHit, r);
+
+	//boolean for if there is a hit before our current hit (which is distance m away)
+	bool is_hit = tempHit.t<m;
+	return is_hit;
+}
+
+float3 lerp(const float3& a, const float3& b, float t) {
+	return a * (1.0f - t) + b * t;
+}
+
 static float3 shade(HitInfo& hit, const float3& viewDir, const int level) {
 	if(level==6)
 		return float3(0.0f, 0.0f, 0.0f);
@@ -342,16 +363,7 @@ static float3 shade(HitInfo& hit, const float3& viewDir, const int level) {
 			// calculating the ray between light position and object hit point
 			float3 l = globalScene.pointLightSources[i]->position - hit.P;
 			//return hit.material->BRDF(l, viewDir, hit.N) * PI;
-			Ray r;
-			r.o = globalScene.pointLightSources[i]->position + 3*Epsilon*hit.N; //moving point by small amount to avoid self-intersection
-			r.d = -normalize(l);
-			HitInfo tempHit;
-			float m = length(l);
-			//find intersection between light ray
-			globalScene.intersect(tempHit, r);
-
-			//boolean for if there is a hit before our current hit (which is distance m away)
-			bool is_hit = tempHit.t<m;
+			bool shadow = inShadow(hit, *globalScene.pointLightSources[i]);
 
 			// the inverse-squared falloff
 			const float falloff = length2(l);
@@ -371,9 +383,11 @@ static float3 shade(HitInfo& hit, const float3& viewDir, const int level) {
 				brdf *= hit.material->fetchPerlinTexture(hit.T);
 			}
 			// return brdf * PI; //debug output
+			float fog_disperstion = beerLambert(fogAbsorbtion, hit.t);
 
 			//multiply irridecence which is 0 if there is no earlier hit and 1 otherwise
-			L += (1-int(is_hit))*irradiance * brdf;
+			float3 pointInFog = fog_disperstion*(1-int(shadow))*irradiance * brdf;
+			L += lerp(backgroundColor, pointInFog, fog_disperstion);
 		}
 		return L;
 	} else if (hit.material->type == MAT_METAL) {
@@ -423,7 +437,6 @@ static float3 shade(HitInfo& hit, const float3& viewDir, const int level) {
 	{
 		return cloud_shade(hit, viewDir, level);
 	} else {
-		// something went wrong - make it apparent that it is an error
 		return float3(100.0f, 0.0f, 100.0f);
 	}
 }
@@ -543,6 +556,11 @@ public:
 	void set_num_ray(const int n)
 	{
 		NUM_RAYS = n;
+	}
+
+	void set_fog(const float f)
+	{
+		fogAbsorbtion = f;
 	}
 
 	void start() const {

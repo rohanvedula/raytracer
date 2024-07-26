@@ -50,6 +50,8 @@ static void parseCommandLine(int argc, const char* argv[])
             CS488.set_apeture(std::stof(argv[i+1]));
         else if(!strcmp(argv[i],"-ray_cast"))
             CS488.set_num_ray(atoi(argv[i+1]));
+        else if(!strcmp(argv[i],"-fog"))
+            CS488.set_fog(std::stof(argv[i+1]));
     }
 }
 

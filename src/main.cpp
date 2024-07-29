@@ -10,12 +10,12 @@ static void setupLightSource() {
     //light.wattage = float3(1000000.0f, 1000000.0f, 1000000.0f);
 
     //multisphere
-    // light.position = float3(0.0f, 300.0f, 100.0f);
-    // light.wattage = float3(3000000.0f, 3000000.0f, 3000000.0f);
+    light.position = float3(0.0f, 300.0f, 100.0f);
+    light.wattage = float3(3000000.0f, 3000000.0f, 3000000.0f);
 
     //normal
-    light.position = float3(3.0f, 3.0f, 3.0f);
-    light.wattage = float3(1000.0f, 1000.0f, 1000.0f);
+    // light.position = float3(3.0f, 3.0f, 3.0f);
+    // light.wattage = float3(1000.0f, 1000.0f, 1000.0f);
     globalScene.addLight(&light);
 }
 

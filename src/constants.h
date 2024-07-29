@@ -43,7 +43,7 @@ constexpr int globalNumParticles = 20;
 float3 backgroundColor = float3(0.0f); //float3(33.0f, 82.0f, 181.0f)/255.0f;
 
 // dynamic camera parameters
-float3 globalEye = float3(0.0f, 0.0f, 1.5f);//float3(0.0f, 70.0f, 150.0f);//float3(0.0f, 0.0f, 120.0f);
+float3 globalEye = float3(0.0f, 70.0f, 150.0f);//float3(0.0f, 0.0f, 120.0f);//float3(0.0f, 0.0f, 1.5f);
 float3 globalLookat = float3(0.0f, 0.0f, 0.0f);
 float3 globalUp = normalize(float3(0.0f, 1.0f, 0.0f));
 float3 globalViewDir; // should always be normalize(globalLookat - globalEye)
@@ -57,7 +57,7 @@ static double m_mouseX = 0.0;
 static double m_mouseY = 0.0;
 const int GRID_SIZE = 400;
 int SAMPLES = 1;
-float timeDelta = 0.005;
+float timeDelta = 0.0f;
 
 static float ApertureRadius = 0.00012f;
 static int NUM_RAYS = 1;

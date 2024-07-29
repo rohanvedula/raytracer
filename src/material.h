@@ -41,6 +41,8 @@ public:
 	int bumpHeight = 0;
 
 	bool perlinTexture = false;
+	bool hasVel = false;
+	float3 velocity = float3(1.0f,0.0f,0.0f);
 
 	Material() {};
 	virtual ~Material() {};

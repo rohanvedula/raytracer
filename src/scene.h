@@ -94,38 +94,56 @@ public:
 		return Ray(aperturePos, normalize(pixelPos - aperturePos));
 	}
 
+	void moveObjects(float timeDelta)
+	{
+		for(int i = 0; i<this->objects.size(); i++)
+			this->objects[i]->incement_triangles(timeDelta);
+		preCalc();
+	}
+
 	// ray tracing (you probably don't need to change it in A2)
-	void Raytrace() const {
+	void Raytrace(){
 		FrameBuffer.clear();
 		// loop over all pixels in the image
-		for (int j = 0; j < globalHeight; ++j) {
-			for (int i = 0; i < globalWidth; ++i) {
-				float3 pixel_value = float3(0.0f);
-				for(int k = 0; k < NUM_RAYS; ++k)
-				{
-					const Ray ray = eyeRay(i, j,k);
-					HitInfo hitInfo;
-					if (intersect(hitInfo, ray)) {
-						pixel_value += shade(hitInfo, -ray.d);
-					} else {
-						pixel_value += (I.width != 0) ? get_from_image(ray.d) : backgroundColor;
+		for(int k = 0; k < SAMPLES; ++k)
+		{
+			for (int j = 0; j < globalHeight; ++j)
+			{
+				for (int i = 0; i < globalWidth; ++i) {
+					float3 pixel_value = float3(0.0f);
+					for(int k = 0; k < NUM_RAYS; ++k)
+					{
+						const Ray ray = eyeRay(i, j,k);
+						HitInfo hitInfo;
+						if (intersect(hitInfo, ray)) {
+							pixel_value += shade(hitInfo, -ray.d);
+						} else {
+							pixel_value += (I.width != 0) ? get_from_image(ray.d) : backgroundColor;
+						}
+					}
+					FrameBuffer.pixel(i, j) += pixel_value/NUM_RAYS;
+				}
+
+				// show intermediate process
+				if (globalShowRaytraceProgress) {
+					constexpr int scanlineNum = 64;
+					if ((j % scanlineNum) == (scanlineNum - 1)) {
+						glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, globalWidth, globalHeight, GL_RGB, GL_FLOAT, &FrameBuffer.pixels[0]);
+						glRecti(1, 1, -1, -1);
+						glfwSwapBuffers(globalGLFWindow);
+						printf("Rendering Progress: %.3f%%\r", j / float(globalHeight - 1) * 100.0f);
+						fflush(stdout);
 					}
 				}
-				FrameBuffer.pixel(i, j) = pixel_value/NUM_RAYS;
 			}
 
-			// show intermediate process
-			if (globalShowRaytraceProgress) {
-				constexpr int scanlineNum = 64;
-				if ((j % scanlineNum) == (scanlineNum - 1)) {
-					glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, globalWidth, globalHeight, GL_RGB, GL_FLOAT, &FrameBuffer.pixels[0]);
-					glRecti(1, 1, -1, -1);
-					glfwSwapBuffers(globalGLFWindow);
-					printf("Rendering Progress: %.3f%%\r", j / float(globalHeight - 1) * 100.0f);
-					fflush(stdout);
-				}
-			}
+			if(k!=SAMPLES-1)
+				moveObjects(timeDelta);
 		}
+
+		for (int j = 0; j < globalHeight; ++j)
+			for (int i = 0; i < globalWidth; ++i)
+				FrameBuffer.pixel(i, j)/= SAMPLES;
 		std::cout<<"DONE\n";
 	}
 

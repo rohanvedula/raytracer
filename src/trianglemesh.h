@@ -28,6 +28,18 @@ public:
 	std::vector<Material> materials;
 	AABB bbox;
 
+	void incement_triangles(float timeDelta)
+	{
+		for (unsigned int i = 0; i < this->triangles.size(); i++) {
+			if(!this->materials[this->triangles[i].idMaterial].hasVel)
+				continue;
+
+			for (int k = 0; k <= 2; k++) {
+				this->triangles[i].positions[k] += timeDelta * this->materials[this->triangles[i].idMaterial].velocity;
+			}
+		}
+	}
+
 	void transform(const float4x4& m) {
 		// ====== implement it if you want =====
 		// matrix transformation of an object
@@ -355,6 +367,13 @@ private:
 				lineStr.erase(0, 8);
 				lineStr.erase(lineStr.size() - 1, 1);
 				materials[i - 1].opacity = std::stof(lineStr);
+			}
+			else if (lineStr.compare(0, 8, "velocity", 0, 8) == 0)
+			{
+				lineStr.erase(0, 9);
+				sscanf(lineStr.c_str(), "%f %f %f\n", &r, &g, &b);
+				materials[i - 1].hasVel = true;
+				materials[i - 1].velocity = float3(r, g, b);
 			}
 
 		}

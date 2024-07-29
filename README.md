@@ -8,3 +8,4 @@ Implemented so far:
 - depth of field blur
 - fog effects
 - soft shadows with random sampling
+- motion blur

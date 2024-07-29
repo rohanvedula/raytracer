@@ -577,6 +577,12 @@ public:
 		fogAbsorbtion = f;
 	}
 
+	void set_samples(const int s, const float time)
+	{
+		SAMPLES = s;
+		timeDelta = time;
+	}
+
 	void start() const {
 		globalScene.preCalc();
 

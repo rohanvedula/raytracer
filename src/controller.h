@@ -1,7 +1,3 @@
-// =======================================
-// CS488/688 base code
-// (written by Toshiya Hachisuka)
-// =======================================
 #pragma once
 #define _CRT_SECURE_NO_WARNINGS
 #define NOMINMAX
@@ -241,19 +237,17 @@ static float3 reflection_shade(const HitInfo& hit, const float3& viewDir, const 
 	{
 		if(I.width==0 || I.height==0)
 			return float3(0.0f);
-		return get_from_image(reflectedRayDir);
+		return hit.material->Ks*get_from_image(reflectedRayDir);
 	}
+
+	if(intersection && reflectedHit.material->type==MAT_CLOUD)
+		return 0.5f * get_from_image(reflectedRayDir);
 	//recursive call, increasing the depth by 1 and multiplying by Ks, reflect ray direction to stanardize
 	// since viewDir is pointing out of hitObject, reflectedRay should be negated
-	return hit.material->Ks*shade(reflectedHit, -reflectedRayDir, level+1);
+	return shade(reflectedHit, -reflectedRayDir, level+1); //hit.material->Ks*shade(reflectedHit, -reflectedRayDir, level+1);
 }
 
 // Function to fade the input value
-
-static float beerLambert(float absorb, float marchSize)
-{
-	return exp(-absorb * marchSize);
-}
 
 static float phase(float3 v, float3 l, float g) {
 	float cosTheta = dot(v, l);
@@ -270,7 +264,7 @@ static float3 cloud_shade(HitInfo& hit, const float3& viewDir, const int level)
 	const float marchSize = 1.1f;
 	float volumeDepth = 0.0f;
 
-	Ray newRay(hit.P - hit.N*Epsilon, -viewDir);
+	Ray newRay(hit.P - 10*hit.N*Epsilon, -viewDir);
 	HitInfo nextHit;
 	globalScene.intersect(nextHit, newRay);
 
@@ -284,7 +278,7 @@ static float3 cloud_shade(HitInfo& hit, const float3& viewDir, const int level)
 		if(volumeDepth > totalDepth)
 			break;
 
-		float3 position = hit.P - hit.N*Epsilon - viewDir*volumeDepth;
+		float3 position = hit.P - 10*hit.N*Epsilon - viewDir*volumeDepth;
 		itr+=1;
 		float p = opaqueVisiblity;
 		opaqueVisiblity *= beerLambert(absorptionCoefficient, marchSize);
@@ -328,7 +322,7 @@ static float inShadow(const HitInfo& hit, const float3& lightPosition)
 {
 	float3 l = lightPosition - hit.P;
 	Ray r;
-	r.o = lightPosition + 3*Epsilon*hit.N; //moving point by small amount to avoid self-intersection
+	r.o = lightPosition + 12*Epsilon*hit.N; //moving point by small amount to avoid self-intersection
 	r.d = -normalize(l);
 	HitInfo tempHit;
 	float m = length(l);
@@ -353,18 +347,13 @@ static float getAverageShadow(const HitInfo& hit, PointLightSource& light)
 	return total_light/iterations;
 }
 
-
-float3 lerp(const float3& a, const float3& b, float t) {
-	return a * (1.0f - t) + b * t;
-}
-
 static float3 shade(HitInfo& hit, const float3& viewDir, const int level) {
 	if(level==6)
-		return float3(0.0f, 0.0f, 0.0f);
+		return float3(92.0f, 141.0f, 168.0f)/255;
 
 
 	if (hit.material->hasBumpMap) {
-		hit.N = mul(hit.pertubeMatrix, hit.material->fetchNormal(hit.T));;
+		hit.N = normalize(mul(hit.pertubeMatrix, hit.material->fetchNormal(hit.T)));
 	}
 
 	if (hit.material->type == MAT_LAMBERTIAN) {
@@ -376,7 +365,7 @@ static float3 shade(HitInfo& hit, const float3& viewDir, const int level) {
 		for (int i = 0; i < globalScene.pointLightSources.size(); i++) {
 			// calculating the ray between light position and object hit point
 			float3 l = globalScene.pointLightSources[i]->position - hit.P;
-			//return hit.material->BRDF(l, viewDir, hit.N) * PI;
+			// return hit.material->BRDF(l, viewDir, hit.N) * PI;
 			float shadow = getAverageShadow(hit, *globalScene.pointLightSources[i]);
 
 			// the inverse-squared falloff
@@ -397,11 +386,7 @@ static float3 shade(HitInfo& hit, const float3& viewDir, const int level) {
 				brdf *= hit.material->fetchPerlinTexture(hit.T);
 			}
 			// return brdf * PI; //debug output
-			float fog_disperstion = beerLambert(fogAbsorbtion, hit.t);
-
-			//multiply irridecence which is 0 if there is no earlier hit and 1 otherwise
-			float3 pointInFog = fog_disperstion*shadow*irradiance * brdf;
-			L += lerp(backgroundColor, pointInFog, fog_disperstion);
+			L += shadow*irradiance * brdf;
 		}
 		return L;
 	} else if (hit.material->type == MAT_METAL) {
@@ -437,15 +422,15 @@ static float3 shade(HitInfo& hit, const float3& viewDir, const int level) {
 		bool intersection = globalScene.intersect(refractedHit, refractedRay);
 
 		// if no intersection, handle like above and return black or background image
+		float R = fresnel(hit, -viewDir, normal);
 		if(!intersection)
 		{
 			if(I.width==0 || I.height==0)
 				return float3(0.0f, 0.0f, 0.0f);
-			return get_from_image(wt);
+			return R*reflection_shade(hit, viewDir, level, dot(-viewDir, hit.N)>=0) + (1-R)*hit.material->Ks*get_from_image(wt);
 		}
 
 		//recusive call, increase depth
-		float R = fresnel(hit, -viewDir, normal);
 		return R*reflection_shade(hit, viewDir, level, dot(-viewDir, hit.N)>=0) + (1-R)*hit.material->Ks*shade(refractedHit, -refractedRay.d, level+1);
 	} else if(hit.material->type == MAT_CLOUD)
 	{

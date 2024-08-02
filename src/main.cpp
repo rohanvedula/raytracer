@@ -6,16 +6,24 @@ Runner runner;
 static PointLightSource light;
 static void setupLightSource() {
     //cloud
-    //light.position = float3(150.0f, 150.0f, 100.0f);
-    //light.wattage = float3(1000000.0f, 1000000.0f, 1000000.0f);
+    // light.position = float3(150.0f, 150.0f, 100.0f);
+    // light.wattage = float3(1000000.0f, 1000000.0f, 1000000.0f);
 
     //multisphere
     light.position = float3(0.0f, 300.0f, 100.0f);
     light.wattage = float3(3000000.0f, 3000000.0f, 3000000.0f);
 
     //normal
-    // light.position = float3(3.0f, 3.0f, 3.0f);
-    // light.wattage = float3(1000.0f, 1000.0f, 1000.0f);
+    // light.position = float3(3.0f, 3.0f, 20.0f);
+    // light.wattage = float3(10000.0f, 10000.0f, 10000.0f);
+
+    // //new cornellbox
+    // light.position = float3(0.0f, 0.5f, 0.0f);
+    // light.wattage = float3(60.0f, 60.0f, 60.0f);
+
+    //final
+    // light.position = float3(0.0f, 300.0f, 100.0f);
+    // light.wattage = float3(9000000.0f, 9000000.0f, 9000000.0f);
     globalScene.addLight(&light);
 }
 
@@ -23,21 +31,31 @@ static void setupLightSource() {
 
 // ======== you probably don't need to modify below in A1 to A3 ========
 // loading .obj file from the command line arguments
-static TriangleMesh mesh;
+static std::vector<TriangleMesh *> meshes;
 static void setupScene(int argc, const char* argv[]) {
     if (argc > 1) {
-        bool objLoadSucceed = mesh.load(argv[1]);
-        if (!objLoadSucceed) {
-            printf("Invalid .obj file.\n");
-            printf("Making a single triangle instead.\n");
-            mesh.createSingleTriangle();
+        int index = 1;
+        while(index<argc)
+        {
+            if(argv[index][0]=='-')
+                break;
+
+            TriangleMesh* mesh = new TriangleMesh();
+            bool objLoadSucceed = mesh->load(argv[index]);
+            if (!objLoadSucceed) {
+                printf("Invalid .obj file.\n");
+                printf("Making a single triangle instead.\n");
+                mesh->createSingleTriangle();
+                break;
+            }
+            index+=1;
+            meshes.push_back(mesh);
+            globalScene.addObject(mesh);
         }
     } else {
         printf("Specify .obj file in the command line arguments. Example: CS488.exe cornellbox.obj\n");
         printf("Making a single triangle instead.\n");
-        mesh.createSingleTriangle();
     }
-    globalScene.addObject(&mesh);
 }
 
 static void parseCommandLine(int argc, const char* argv[])
@@ -69,4 +87,8 @@ int main(int argc, const char* argv[]) {
     parseCommandLine(argc, argv);
 
     runner.start();
+
+    for (auto mesh : meshes) {
+        delete mesh;
+    }
 }

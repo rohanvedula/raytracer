@@ -22,6 +22,15 @@ static float3 get_from_image(const float3& ray)
 	return I.pixel(int(pixel[0]*I.width), int(pixel[1]*I.height));
 }
 
+static float beerLambert(float absorb, float marchSize)
+{
+	return exp(-absorb * marchSize);
+}
+
+float3 lerp(const float3& a, const float3& b, float t) {
+	return a * (1.0f - t) + b * t;
+}
+
 // scene definition
 class Scene {
 public:
@@ -116,7 +125,9 @@ public:
 						const Ray ray = eyeRay(i, j,k);
 						HitInfo hitInfo;
 						if (intersect(hitInfo, ray)) {
-							pixel_value += shade(hitInfo, -ray.d);
+							float fog_disperstion = beerLambert(fogAbsorbtion, hitInfo.t);
+							float3 pointInFog = fog_disperstion * shade(hitInfo, -ray.d);
+							pixel_value += lerp(backgroundColor, pointInFog, fog_disperstion);
 						} else {
 							pixel_value += (I.width != 0) ? get_from_image(ray.d) : backgroundColor;
 						}

@@ -1,0 +1,22 @@
+# Blender 4.2.0 MTL File: 'finalScene.blend'
+# www.blender.org
+
+newmtl wood_Mat
+Ka 1.000000 1.000000 1.000000
+Ks 0.000000 0.000000 0.000000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+Ns 10.000005
+illum 1
+map_Kd tiles.png
+
+newmtl wood_Mat.001
+Ka 1.000000 1.000000 1.000000
+Ks 0.000000 0.000000 0.000000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+Ns 10.000005
+illum 1
+map_Kd tiles.png

@@ -3,7 +3,7 @@
 At command line, provide path to file(s) with the following optional arguments
 - `-apeture` sets the aperture radius, next input is the radius of the aperture
 - `-fog` sets the background fog absorption (default is 0), next input is absorption
-- `-samples` used for motion blur, next argument is number of samples and next is time delta
+- `-samples` used for motion blur, first argument is number of samples and next is time delta
 - `-ray_cast` sets number of random samples of light source, next input is number of rays cast
 - `-load_back` sets background image, next input is path to background image
 
@@ -45,3 +45,36 @@ As an extra, I also implemented soft shadows for objects. For each point which i
 The final scene I chose to render is a series of marbles on a flat metal distorted metal plane with clouds in the sky and a background image. The Fresnel reflection is present in the marble in the foreground, we can see the volumetric rendering with the clouds, bump mapping is used for the distortion on the metal plane (notice the reflections are distorted) and the marble on the right, perlin noise is implemented as a height map for the plane and in the clouds, depth of field is present as the marble in the background is more blurred, and motion blur is present in leftmost marble.
 
 <img src="/renders/finalScene.png" alt="drawing" width="500" style="display: block; margin-left: auto; margin-right: auto;">
+
+### Sources
+Information references, code samples used for the Perlin noise, and external models are from the following sources:
+
+
+J. Bender, M. Müller, M. Macklin. "Position-Based Simulation Methods in Computer Graphics." _TU Darmstadt, and NVIDIA PhysX Research_, EUROGRAPHICS 2015
+
+J. Blinn, "A Generalization of Algebraic Surface Drawing", _ACM Transactions on Graphics_, Vol. 1, No. 3, pp. 235-256, July, 1982.
+
+B.A. Barsky, T.J. Kosloff. "Algorithms for Rendering Depth of Field Effects in Computer Graphics." _University of California Berkeley_, 2015.
+
+T. Akenine-Möller, J. Nilsson, M. Andersson, C. Barré-Brisebois, R. Toth, T. Karras. "Texture Level of Detail Strategies for Real-Time Ray Tracing." _NVIDIA, Electronic Arts_, Apress 2019.
+
+M. Ikits, J. Kniss, A. Lefohn, C. Hansen. "Volume Rendering Techniques." _PU Gems_, Vol 1. pp. 290-196 
+
+A. Tatarinov. "Perlin Noise in Real-time Computer Graphics." _Moscow State University_
+
+K Perlin. 1985. An image synthesizer. In Proceedings of the 12th annual conference on Computer graphics and interactive techniques (SIGGRAPH '85). ACM, New York, NY, USA, 287-296.
+
+S Hillaire. 2016. "Physically Based Sku, Atmosphere and Cloud Rendering", _EA Frostbite_
+
+A. Bouthors et Al. February 2008. "Interactive multiple anisotropic scattering in clouds". _ACM Digital Library_
+
+M. McGuire. July 2017. "Computer Graphics Archive", https://casual-effects.com/data/
+
+S. Gustavson. n.d. "Worley Noise Implementations" https://stegu.github.io/webgl-noise/webdemo/cellular.html
+
+P. Shirley. March 2020. "Schlick's Approximation" https://psgraphics.blogspot.com/2020/03/fresnel-equations-schlick-approximation.html
+
+S. Majboroda. March 2024. "Autumn Field (Pure Sky) HDRI" https://polyhaven.com/a/autumn_field_puresky
+
+Katsukagi. July 2024. "Stylized Tiles" https://3dtextures.me/2024/07/06/stylized-tiles-003/
+

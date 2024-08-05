@@ -44,7 +44,7 @@ float3 backgroundColor = float3(84,107,171)/255;//float3(0.0f);//float3(84,107,1
 float3 fogColor = float3(0.1f);
 
 // dynamic camera parameters
-float3 globalEye = float3(0.0f, 70.0f, 150.0f);//float3(0.0f, 30.0f, 150.0f);//float3(0.0f, 0.0f, 1.5f);//float3(0.0f, 0.0f, 120.0f);//float3(0.0f, 70.0f, 150.0f);
+float3 globalEye = float3(0.0f, 30.0f, 150.0f);//float3(0.0f, 0.0f, 1.5f);//float3(0.0f, 0.0f, 120.0f);//float3(0.0f, 70.0f, 150.0f);
 float3 globalLookat = float3(0.0f, 0.0f, 0.0f);
 float3 globalUp = normalize(float3(0.0f, 1.0f, 0.0f));
 float3 globalViewDir; // should always be normalize(globalLookat - globalEye)

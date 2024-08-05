@@ -127,7 +127,7 @@ public:
 						if (intersect(hitInfo, ray)) {
 							float fog_disperstion = beerLambert(fogAbsorbtion, hitInfo.t);
 							float3 pointInFog = fog_disperstion * shade(hitInfo, -ray.d);
-							pixel_value += lerp(backgroundColor, pointInFog, fog_disperstion);
+							pixel_value += lerp(fogColor, pointInFog, fog_disperstion);
 						} else {
 							pixel_value += (I.width != 0) ? get_from_image(ray.d) : backgroundColor;
 						}
